@@ -3,19 +3,23 @@ import cors from "cors";
 import admin from "firebase-admin";
 
 const app = express();
+
+/*
+========================================
+ Middleware
+========================================
+*/
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 
 /*
 ========================================
  Firebase Admin Initialization
 ========================================
- Service account is loaded from ENV
- (Render → Environment Variables)
 */
-
 if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-  throw new Error("❌ FIREBASE_SERVICE_ACCOUNT env missing");
+  console.error("❌ FIREBASE_SERVICE_ACCOUNT env missing");
+  process.exit(1);
 }
 
 const serviceAccount = JSON.parse(
@@ -26,17 +30,27 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
+console.log("✅ Firebase Admin initialized");
+
 /*
 ========================================
- API : Send Command to Child App
+ API : SEND COMMAND (DEBUG ENABLED)
 ========================================
 */
-
 app.post("/send-command", async (req, res) => {
+
+  // 🔥 FINAL PROOF LOGS
+  console.log("=================================");
+  console.log("🔥 REQUEST RECEIVED");
+  console.log("🔥 HEADERS:", req.headers);
+  console.log("🔥 BODY:", req.body);
+  console.log("=================================");
+
   try {
     const { fcmToken, action, camera } = req.body;
 
     if (!fcmToken || !action) {
+      console.log("❌ Missing fcmToken or action");
       return res.status(400).json({
         success: false,
         message: "fcmToken and action are required"
@@ -56,15 +70,17 @@ app.post("/send-command", async (req, res) => {
 
     const response = await admin.messaging().send(message);
 
-    res.json({
+    console.log("✅ FCM SENT SUCCESSFULLY:", response);
+
+    return res.json({
       success: true,
-      message: "✅ FCM command sent",
+      message: "FCM command sent",
       response
     });
 
   } catch (error) {
-    console.error("FCM ERROR:", error);
-    res.status(500).json({
+    console.error("❌ FCM SEND ERROR:", error);
+    return res.status(500).json({
       success: false,
       error: error.message
     });
@@ -73,12 +89,11 @@ app.post("/send-command", async (req, res) => {
 
 /*
 ========================================
- Health Check API
+ Health Check
 ========================================
 */
-
 app.get("/", (req, res) => {
-  res.send("✅ FCM Backend is running");
+  res.send("✅ FCM Backend is running (DEBUG MODE)");
 });
 
 /*
@@ -86,7 +101,6 @@ app.get("/", (req, res) => {
  Start Server
 ========================================
 */
-
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("🚀 Server running on port", PORT);
